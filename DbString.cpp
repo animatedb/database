@@ -53,20 +53,13 @@ static inline void appendColumnName(String &targetString, StringRef columns, siz
     appendArg(targetString, columns, startColumnPos);
     }
 
-static inline void appendValue(String &targetString, StringRef values, size_t startValuePos)
+static void appendValues(String &targetString, DbValues const &values)
     {
-    targetString.append("\"");
-    appendArg(targetString, values, startValuePos);
-    targetString.append("\"");
-    }
-
-static void appendBoundValues(String &targetString, size_t numBoundValues)
-    {
-    for(int i=0; i<numBoundValues; i++)
+    for(size_t i=0; i<values.size(); i++)
         {
         if(i != 0)
             { targetString.append(","); }
-        targetString.append("?");
+        targetString.append(values.getValue(i));
         }
     }
 
@@ -79,40 +72,22 @@ static void appendColumnNames(String &targetString, StringRef colNames)
         }
     }
 
-// Appends values with no outer parenthesis
-static void appendValues(String &targetString, StringRef values)
-    {
-    size_t startArgPos = 0;
-//    if(values.length() != 0)
-        {
-        // parse string and separate into values.
-        while(startArgPos != String::npos)
-            {
-            appendValue(targetString,  values, startArgPos);
-            }
-        }
-// Should use bind null
-//    else
-//        {
-//        append("NULL");
-//        }
-    }
-
 static void appendNamesAndValues(String &targetString, StringRef columnNames,
-    StringRef values)
+    DbValues const &values)
     {
     size_t startColPos = 0;
-    size_t startValuePos = 0;
-    while(startColPos != String::npos && startValuePos != String::npos)
+    size_t valueIndex = 0;
+    while(startColPos != String::npos && valueIndex<values.size())
         {
         appendColumnName(targetString, columnNames, startColPos);
         targetString.append("=");
-        appendValue(targetString, values, startValuePos);
-        if(startColPos != String::npos && startValuePos != String::npos)
-            {
-            targetString.append(",");
-            }
+        targetString.append(values.getValue(valueIndex++));
         }
+    }
+
+String DbValues::getValue(size_t index) const
+    {
+    return "?";
     }
 
 void DbString::startStatement(StringRef statement, StringRef arg)
@@ -129,31 +104,31 @@ DbString &DbString::FROM(StringRef table)
     return *this;
     }
 
-DbString &DbString::SET(StringRef columns, size_t numBoundValues)
+DbString &DbString::SET(StringRef columns, DbValues const &values)
     {
     append(" SET ");
-//    appendNamesAndValues(*this, columns, numBoundValues);
+    appendNamesAndValues(*this, columns, values);
     return *this;
     }
 
-DbString &DbString::WHERE(StringRef columnName, StringRef operStr, size_t numBoundValues)
+DbString &DbString::WHERE(StringRef columnName, StringRef operStr, DbValues const &values)
     {
     append(" WHERE ");
     append(columnName);
     append(operStr);
     append("(");
-    appendBoundValues(*this, numBoundValues);
+    appendValues(*this, values);
     append(")");
     return *this;
     }
 
-DbString &DbString::AND(StringRef columnName, StringRef operStr, size_t numBoundValues)
+DbString &DbString::AND(StringRef columnName, StringRef operStr, DbValues const &values)
     {
     append(" AND ");
     append(columnName);
     append(operStr);
     append("(");
-    appendBoundValues(*this, numBoundValues);
+    appendValues(*this, values);
     append(")");
     return *this;
     }
@@ -166,18 +141,10 @@ DbString &DbString::INTO(StringRef columnNames)
     return *this;
     }
 
-DbString &DbString::VALUES(StringRef columnValues)
+DbString &DbString::VALUES(DbValues const &values)
     {
     append("VALUES (");
-    appendValues(*this, columnValues);
-    append(")");
-    return *this;
-    }
-
-DbString &DbString::VALUES(size_t numBoundValues)
-    {
-    append("VALUES (");
-    appendBoundValues(*this, numBoundValues);
+    appendValues(*this, values);
     append(")");
     return *this;
     }

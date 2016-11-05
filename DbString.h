@@ -14,12 +14,26 @@
 typedef std::string const &StringRef;
 typedef std::string String;
 
+/// @todo - This could change if non-bound parameters  are desired.
+class DbValues
+    {
+    public:
+        DbValues(size_t numBoundParams):
+            mNumBoundParams(numBoundParams)
+            {}
+        size_t size() const
+            { return mNumBoundParams; }
+        String getValue(size_t index) const;
+    private:
+        size_t mNumBoundParams;
+    };
+
 // This uses method chaining or the named parameter idiom.
 // Examples:
-//      dbStr.SELECT("idModule").FROM("Module").WHERE("name", "=").VALUES(2);
-//      dbStr.INSERT("Module").INTO("idModule, name").VALUES(2);
-//      dbStr.UPDATE("Module").SET("idModule, name").VALUES(2);
-//      dbStr.DELETE("idModule").FROM("Module");
+//    dbStr.SELECT("catId").FROM("Cat").WHERE("catName", "=", 1).AND("catId", "=", 1);
+//    dbStr.INSERT("Cat").INTO("catId, catName").VALUES(2);
+//    dbStr.UPDATE("Cat").SET("catId, catName", 2);
+//    dbStr.DELETEFROM("Cat");
 class DbString:public String
     {
     public:
@@ -49,7 +63,7 @@ class DbString:public String
             return *this;
             }
 
-        DbString &DELETE(StringRef table)
+        DbString &DELETEFROM(StringRef table)
             {
             startStatement("DELETE FROM ", table);
             return *this;
@@ -60,19 +74,18 @@ class DbString:public String
         // Appends "(columnName1, columnName2)"
         DbString &INTO(StringRef columnNames);
         // Appends "VALUES (columnValue1, columnValue2)"
-        DbString &VALUES(StringRef columnValues);
-        DbString &VALUES(size_t numBoundValues);
+        DbString &VALUES(DbValues const &values);
 
         // Appends " SET column1, column2 = value1, value2"
         // The number of columns and values must match.
-        DbString &SET(StringRef columnNames, size_t numBoundValues);
+        DbString &SET(StringRef columnNames, DbValues const &values);
 
         // Appends " WHERE columnName operStr colVal"
         DbString &WHERE(StringRef columnName, StringRef operStr,
-            size_t numBoundValues);
+            DbValues const &values);
         // Appends " AND columnName operStr colVal"
         DbString &AND(StringRef columnName, StringRef operStr,
-            size_t numBoundValues);
+            DbValues const &values);
         // Appends a semicolon to the returned string.
         String getDbStr();
 
