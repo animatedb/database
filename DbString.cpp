@@ -9,7 +9,8 @@
 #include <ctype.h>
 
 
-// Finds comma delimited arguments. Spaces are skipped.
+/// Finds comma delimited arguments. Spaces are skipped.
+/// @param startArgPos Start of arg, updated to next start of arg.
 static size_t findNextArg(StringRef args, size_t &startArgPos)
     {
     size_t retArgLen = 0;
@@ -20,33 +21,30 @@ static size_t findNextArg(StringRef args, size_t &startArgPos)
         size_t endArgPos = args.find(',', startArgPos);
         if(endArgPos != std::string::npos)
             {
-            endArgPos++;        // Skip comma
             retArgLen = endArgPos - startArgPos;
+            startArgPos = endArgPos+1;       // Skip comma
             }
         else
             {
-            retArgLen = args.length()-startArgPos;
-            }
-        if(retArgLen == 0)
-            {
-            startArgPos = String::npos;
-            }
-        else
-            {
-            startArgPos += retArgLen;
+            retArgLen = args.length()-startArgPos+1;
+            startArgPos = endArgPos;
             }
         }
     return retArgLen;
     }
 
 // Appends comma delimited arguments to a string.
-static void appendArg(String &targetString, StringRef args, size_t &startArgPos)
+static void appendArg(String &targetString, StringRef args, size_t &argPos)
     {
-    int len = findNextArg(args, startArgPos);
-    if(startArgPos != String::npos)
+    size_t startArgPos = argPos;
+    int len = findNextArg(args, argPos);
+    if(len > 0)
         {
+        if(startArgPos != 0)
+            {
+            targetString.append(",");
+            }
         targetString.append(&args[startArgPos], len);
-        targetString.append(",");
         }
     }
 
