@@ -27,22 +27,30 @@ static size_t findNextArg(StringRef args, size_t &startArgPos)
             {
             retArgLen = args.length()-startArgPos;
             }
+        if(retArgLen == 0)
+            {
+            startArgPos = String::npos;
+            }
+        else
+            {
+            startArgPos += retArgLen;
+            }
         }
     return retArgLen;
     }
 
 // Appends comma delimited arguments to a string.
-static void appendArg(String &targetString, StringRef args, size_t startArgPos)
+static void appendArg(String &targetString, StringRef args, size_t &startArgPos)
     {
     int len = findNextArg(args, startArgPos);
-    targetString.append(&args[startArgPos], len);
     if(startArgPos != String::npos)
         {
+        targetString.append(&args[startArgPos], len);
         targetString.append(",");
         }
     }
 
-static inline void appendColumnName(String &targetString, StringRef columns, size_t startColumnPos)
+static inline void appendColumnName(String &targetString, StringRef columns, size_t &startColumnPos)
     {
     appendArg(targetString, columns, startColumnPos);
     }
@@ -185,3 +193,4 @@ String DbString::getDbStr()
         }
     return *this;
     }
+
