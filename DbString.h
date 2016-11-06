@@ -4,6 +4,10 @@
 *  Created on: Nov 2, 2016
 *  \copyright 2016 DCBlaha.  Distributed under the GPL.
 */
+// This provides an efficient SQL string builder where the source code is easy to read.
+// This only supports prepared statements at the moment.
+// This does not handle all types of queries. The examples below show some of them.
+
 
 #ifndef DB_STRING_H
 #define DB_STRING_H
@@ -14,25 +18,20 @@
 typedef std::string const &StringRef;
 typedef std::string String;
 
+enum DbValueParamCounts { ONE_PARAM=1, TWO_PARAMS, THREE_PARAMS, FOUR_PARAMS};
+
 /// @todo - This could change if non-bound parameters  are desired.
-class DbValues
+class DbValues:public String
     {
     public:
-        DbValues(size_t numBoundParams):
-            mNumBoundParams(numBoundParams)
-            {}
-        size_t size() const
-            { return mNumBoundParams; }
-        String getValue(size_t index) const;
-    private:
-        size_t mNumBoundParams;
+        DbValues(DbValueParamCounts numBoundParams);
     };
 
 // This uses method chaining or the named parameter idiom.
 // Examples:
-//    dbStr.SELECT("catId").FROM("Cat").WHERE("catName", "=", 1).AND("catId", "=", 1);
-//    dbStr.INSERT("Cat").INTO("catId, catName").VALUES(2);
-//    dbStr.UPDATE("Cat").SET("catId, catName", 2);
+//    dbStr.SELECT("catId").FROM("Cat").WHERE("catName", "=", ONE_PARAM).AND("catId", "=", ONE_PARAM);
+//    dbStr.INSERT("Cat").INTO("catId, catName").VALUES(TWO_PARAMS);
+//    dbStr.UPDATE("Cat").SET("catId, catName", TWO_PARAMS);
 //    dbStr.DELETEFROM("Cat");
 class DbString:public String
     {
