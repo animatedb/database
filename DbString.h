@@ -2,7 +2,7 @@
 * DbString.h
 *
 *  Created on: Nov 2, 2016
-*  \copyright 2016 DCBlaha.  Distributed under the GPL.
+*  \copyright 2016 DCBlaha.  Distributed under the Mozilla Public License 2.0.
 */
 // This provides an efficient SQL string builder where the source code is easy to read.
 // This only supports prepared statements at the moment.

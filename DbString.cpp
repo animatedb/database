@@ -2,7 +2,7 @@
 * DbString.cpp
 *
 *  Created on: Nov 2, 2016
-*  \copyright 2016 DCBlaha.  Distributed under the GPL.
+*  \copyright 2016 DCBlaha.  Distributed under the Mozilla Public License 2.0.
 */
 
 #include "DbString.h"
