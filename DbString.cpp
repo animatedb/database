@@ -11,23 +11,26 @@
 
 /// Finds comma delimited arguments. Spaces are skipped.
 /// Usage is typically to continue until length is zero.
-/// @param startArgPos Start of arg, updated to start of arg. Start of next arg
-///     will be startArgPos+returned length.
-static size_t findNextArg(StringRef args, size_t &startArgPos)
+/// @param argPos This is incremented through the arguments. It is advanced to
+///     after the currently returned argument.
+/// @startArgPos This is the returned start position of the currently found argument.
+static size_t findNextArg(StringRef args, size_t &argIter, size_t &startArgPos)
     {
     size_t retArgLen;
-    if(startArgPos != String::npos)
+    if(argIter != String::npos)
         {
-        while(args[startArgPos] == ' ')
-            { startArgPos++; }
-        size_t endArgPos = args.find(',', startArgPos);
-        if(endArgPos != std::string::npos)
+        while(args[argIter] == ' ')
+            { argIter++; }
+        startArgPos = argIter;
+        argIter = args.find(',', startArgPos);
+        if(argIter != std::string::npos)
             {
-            retArgLen = endArgPos - startArgPos;
+            retArgLen = argIter - startArgPos;
+            argIter++;      // Add one for comma
             }
         else
             {
-            retArgLen = args.length()-startArgPos;
+            retArgLen = args.length() - startArgPos;
             }
         }
     return retArgLen;
@@ -35,21 +38,18 @@ static size_t findNextArg(StringRef args, size_t &startArgPos)
 
 // Appends argument to a string.
 // Updates startArgPos to point to next starting argument.
-static void appendArg(String &targetString, StringRef args, size_t &startArgPos, bool insertDelimiter)
+static void appendArg(String &targetString, StringRef args, size_t &argPos, bool insertDelimiter)
     {
-    int len = findNextArg(args, startArgPos);
+    size_t initialArgPos = argPos;
+    size_t startArgPos;
+    int len = findNextArg(args, argPos, startArgPos);
     if(len > 0)
         {
-        if(startArgPos != 0 && insertDelimiter)
+        if(initialArgPos != 0 && insertDelimiter)
             {
             targetString.append(",");
             }
         targetString.append(&args[startArgPos], len);
-        startArgPos += len + 1;     // Skip comma
-        }
-    else
-        {
-        startArgPos = String::npos;
         }
     }
 
@@ -151,7 +151,7 @@ DbString &DbString::AND(StringRef columnName, StringRef operStr, DbValues const 
     return *this;
     }
 
-DbString &DbString::INTO(StringRef columnNames)
+DbString &DbString::COLUMNS(StringRef columnNames)
     {
     append("(");
     appendColumnNames(*this, columnNames);
@@ -176,4 +176,3 @@ String DbString::getDbStr()
         }
     return *this;
     }
-

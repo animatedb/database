@@ -20,20 +20,43 @@ typedef std::string String;
 
 enum DbValueParamCounts { ONE_PARAM=1, TWO_PARAMS, THREE_PARAMS, FOUR_PARAMS};
 
-/// @todo - This could change if non-bound parameters  are desired.
+/// This supports non-bound parameters, but generally should be used for
+/// bound parameters.  This can be used two ways for bound parameters.
+/// 1. For example, TWO_PARAMS will insert "?,?". Bind functions use base 1 ordinals.
+/// 2. For example, ":id, :name". Bind functions can then use these names.
 class DbValues:public String
     {
     public:
+        /// This adds the specified number of question marks. Each question
+        /// mark corresponds to a bound value.
         DbValues(DbValueParamCounts numBoundParams);
+
+        /// This is for bound parameters.
+        /// @params params A list of comma delimited parameters with leading colons
+        ///     such as ":id, :name". Then these names can be used with bind
+        ///     functions.
+        DbValues(StringRef params):
+            String(params)
+            {}
+
+        DbValues(char const *params):
+            String(params)
+            {}
     };
 
-// This uses method chaining or the named parameter idiom.
+// This uses method chaining or the named parameter idiom. These are meant to be used
+// with bound parameters.
+//
 // Examples:
 //    dbStr.SELECT("catId").FROM("Cat").WHERE("catName", "=", ONE_PARAM).AND("catId", "=", ONE_PARAM);
-//    dbStr.INSERT("Cat").INTO("catId, catName").VALUES(TWO_PARAMS);
+//    dbStr.SELECT("catId").FROM("Cat").WHERE("catName", "=", ONE_PARAM).AND("catId", "=", ":name");
+//
+//    dbStr.INSERT_INTO("Cat").COLUMNS("catId, catName").VALUES(TWO_PARAMS);
+//    dbStr.INSERT_INTO("Cat").COLUMNS("catId, catName").VALUES(":id, :name");
+//
 //    dbStr.UPDATE("Cat").SET("catId, catName", TWO_PARAMS);
 //    dbStr.DELETEFROM("Cat");
-class DbString:public String
+class DbString:private String
     {
     public:
         DbString()
@@ -49,7 +72,7 @@ class DbString:public String
             }
 
         // Appends "INSERT INTO table"
-        DbString &INSERT(StringRef table)
+        DbString &INSERT_INTO(StringRef table)
             {
             startStatement("INSERT INTO ", table);
             return *this;
@@ -61,6 +84,14 @@ class DbString:public String
             startStatement("UPDATE ", table);
             return *this;
             }
+/*
+// This doesn't work for sqlite?
+        DbString &SHOWTABLES(StringRef databaseName)
+            {
+            startStatement("SHOW TABLES FROM ", databaseName);
+            return *this;
+            }
+*/
 
         DbString &DELETEFROM(StringRef table)
             {
@@ -71,7 +102,7 @@ class DbString:public String
         // Appends " FROM "
         DbString &FROM(StringRef table);
         // Appends "(columnName1, columnName2)"
-        DbString &INTO(StringRef columnNames);
+        DbString &COLUMNS(StringRef columnNames);
         // Appends "VALUES (columnValue1, columnValue2)"
         DbString &VALUES(DbValues const &values);
 
@@ -95,4 +126,3 @@ class DbString:public String
     };
 
 #endif
-
