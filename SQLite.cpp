@@ -1,3 +1,9 @@
+/*
+* SQLite.cpp
+*
+*  Created on: Sept. 28, 2015
+*  \copyright 2015 DCBlaha.  Distributed under the Mozilla Public License 2.0.
+*/
 
 #include "SQLite.h"
 

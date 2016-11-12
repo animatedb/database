@@ -1,3 +1,9 @@
+/*
+* SQLite.h
+*
+*  Created on: Sept. 28, 2015
+*  \copyright 2015 DCBlaha.  Distributed under the Mozilla Public License 2.0.
+*/
 
 // This file allows using an SQLite database without requiring any
 // source files from the SQLite project.  This performs a run time load
