@@ -44,6 +44,14 @@ class DbValues:public String
             {}
     };
 
+class DbExpression:private String
+    {
+    public:
+	DbExpression(StringRef columnName, StringRef operStr, DbValues const &values);
+        String const &getExpStr() const
+            { return *this; }
+    };
+
 // This uses method chaining or the named parameter idiom. These are meant to be used
 // with bound parameters.
 //
@@ -111,11 +119,11 @@ class DbString:private String
         DbString &SET(StringRef columnNames, DbValues const &values);
 
         // Appends " WHERE columnName operStr colVal"
-        DbString &WHERE(StringRef columnName, StringRef operStr,
-            DbValues const &values);
+        DbString &WHERE(StringRef columnName, StringRef operStr, DbValues const &values);
+        DbString &WHERE(DbExpression const &expression);
         // Appends " AND columnName operStr colVal"
-        DbString &AND(StringRef columnName, StringRef operStr,
-            DbValues const &values);
+        DbString &AND(StringRef columnName, StringRef operStr, DbValues const &values);
+        DbString &AND(DbExpression const &expression);
         // Appends a semicolon to the returned string.
         String getDbStr();
 

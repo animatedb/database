@@ -12,7 +12,7 @@
 #ifndef SQLITE_H
 #define SQLITE_H
 #include "Module.h"
-#include "Errors.h"
+#include <string.h>
 
 // This is the C style interface to the run-time library.
 extern "C"
@@ -139,60 +139,60 @@ struct SQLiteResult
 class SQLiteStatement
 {
 public:
-	SQLiteStatement(SQLite &db, char const *query):
-		mDb(db)
-		{ set(query); }
+    SQLiteStatement(SQLite &db, char const *query):
+        mDb(db)
+        { set(query); }
     // This does a finalize.
 	~SQLiteStatement();
-    void set(char const *query);
-	int step();
-	int reset()
-		{ return mDb.sqlite3_reset(mStatement); }
+    int set(char const *query);
+    int step();
+    int reset()
+        { return mDb.sqlite3_reset(mStatement); }
 
     int getColumnBytes(int columnIndex) const
-		{ return mDb.sqlite3_column_bytes(mStatement, columnIndex); }
-	char const *getColumnText(int columnIndex) const
-		{ return mDb.sqlite3_column_text(mStatement, columnIndex); }
-	void const *getColumnBlob(int columnIndex) const
-		{ return mDb.sqlite3_column_blob(mStatement, columnIndex); }
+        { return mDb.sqlite3_column_bytes(mStatement, columnIndex); }
+    char const *getColumnText(int columnIndex) const
+        { return mDb.sqlite3_column_text(mStatement, columnIndex); }
+    void const *getColumnBlob(int columnIndex) const
+        { return mDb.sqlite3_column_blob(mStatement, columnIndex); }
 
     // Bind ordinals are base one.
     int bindNull(int ordinal)
-		{ return mDb.sqlite3_bind_null(mStatement, ordinal); }
+        { return mDb.sqlite3_bind_null(mStatement, ordinal); }
     int bindNull(char const *param)
-		{
+        {
         return mDb.sqlite3_bind_null(mStatement,
             mDb.sqlite3_bind_parameter_index(mStatement, param));
         }
-	int bindInt(int ordinal, int val)
-		{ return mDb.sqlite3_bind_int(mStatement, ordinal, val); }
-	int bindInt(char const *param, int val)
-		{
+    int bindInt(int ordinal, int val)
+        { return mDb.sqlite3_bind_int(mStatement, ordinal, val); }
+    int bindInt(char const *param, int val)
+        {
         return mDb.sqlite3_bind_int(mStatement, 
             mDb.sqlite3_bind_parameter_index(mStatement, param), val);
         }
-	int bindDouble(int ordinal, double val)
-		{ return mDb.sqlite3_bind_double(mStatement, ordinal, val); }
-	int bindDouble(char const *param, double val)
-		{ 
+    int bindDouble(int ordinal, double val)
+        { return mDb.sqlite3_bind_double(mStatement, ordinal, val); }
+    int bindDouble(char const *param, double val)
+        { 
         return mDb.sqlite3_bind_double(mStatement, 
             mDb.sqlite3_bind_parameter_index(mStatement, param), val);
         }
-	int bindText(int ordinal, char const *val)
-		{
+    int bindText(int ordinal, char const *val)
+        {
         /// @todo - strlen may not be right for UTF-8
         return mDb.sqlite3_bind_text(mStatement, ordinal, val,
             static_cast<int>(strlen(val)), nullptr);
         }
-	int bindText(char const *param, char const *val)
-		{
+    int bindText(char const *param, char const *val)
+        {
         /// @todo - strlen may not be right for UTF-8
         return mDb.sqlite3_bind_text(mStatement,
             mDb.sqlite3_bind_parameter_index(mStatement, param), val,
             static_cast<int>(strlen(val)), nullptr);
         }
-	int bindBlob(int ordinal, const void *bytes, int elNumBytes)
-		{ return mDb.sqlite3_bind_blob(mStatement, ordinal, bytes, elNumBytes, SQLITE_STATIC); }
+    int bindBlob(int ordinal, const void *bytes, int elNumBytes)
+        { return mDb.sqlite3_bind_blob(mStatement, ordinal, bytes, elNumBytes, SQLITE_STATIC); }
 
 private:
 	sqlite3_stmt *mStatement;

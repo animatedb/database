@@ -108,6 +108,16 @@ DbValues::DbValues(DbValueParamCounts numBoundParams)
         }
     }
 
+DbExpression::DbExpression(StringRef columnName, StringRef operStr,
+        DbValues const &values)
+        {
+        append(columnName);
+        append(operStr);
+        append("(");
+        appendValues(*this, values);
+        append(")");
+        }
+
 void DbString::startStatement(StringRef statement, StringRef arg)
     {
     clear();
@@ -131,23 +141,27 @@ DbString &DbString::SET(StringRef columns, DbValues const &values)
 
 DbString &DbString::WHERE(StringRef columnName, StringRef operStr, DbValues const &values)
     {
+    WHERE(DbExpression(columnName, operStr, values));
+    return *this;
+    }
+
+DbString &DbString::WHERE(DbExpression const &expression)
+    {
     append(" WHERE ");
-    append(columnName);
-    append(operStr);
-    append("(");
-    appendValues(*this, values);
-    append(")");
+    append(expression.getExpStr());
     return *this;
     }
 
 DbString &DbString::AND(StringRef columnName, StringRef operStr, DbValues const &values)
     {
+    AND(DbExpression(columnName, operStr, values));
+    return *this;
+    }
+
+DbString &DbString::AND(DbExpression const &expression)
+    {
     append(" AND ");
-    append(columnName);
-    append(operStr);
-    append("(");
-    appendValues(*this, values);
-    append(")");
+    append(expression.getExpStr());
     return *this;
     }
 

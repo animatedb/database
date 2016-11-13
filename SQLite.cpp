@@ -94,27 +94,28 @@ SQLiteStatement::~SQLiteStatement()
 		}
 	}
 
-void SQLiteStatement::set(char const *query)
+int SQLiteStatement::set(char const *query)
     {
     if(mStatement)
         {
         reset();
         }
-	mStatement = nullptr;
-	int res = mDb.sqlite3_prepare_v2(mDb.getDb(), query, -1, &mStatement, nullptr);
-    if(res == SQLITE_ERROR)
-        {
-        ErrorTrace(mDb.sqlite3_errmsg(mDb.getDb()));
-        }
+    mStatement = nullptr;
+    int res = mDb.sqlite3_prepare_v2(mDb.getDb(), query, -1, &mStatement, nullptr);
+//    if(res == SQLITE_ERROR)
+//        {
+//        ErrorTrace(mDb.sqlite3_errmsg(mDb.getDb()));
+//        }
+    return res;
     }
 
 int SQLiteStatement::step()
-	{
+    {
     int res = mDb.sqlite3_step(mStatement);
-    if(res != SQLITE_OK && res != SQLITE_DONE && res != SQLITE_ROW)
-        {
-        ErrorTrace(mDb.sqlite3_errmsg(mDb.getDb()));
-        }
+//    if(res != SQLITE_OK && res != SQLITE_DONE && res != SQLITE_ROW)
+//        {
+//        ErrorTrace(mDb.sqlite3_errmsg(mDb.getDb()));
+//        }
     return res;
     }
 
