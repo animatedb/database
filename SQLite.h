@@ -19,6 +19,7 @@ extern "C"
 {
 typedef struct sqlite3 sqlite3;
 typedef int (*SQLite_callback)(void*,int,char**,char**);
+typedef void *sqlite3_mutex_ptr;
 typedef struct sqlite3_stmt sqlite3_stmt;
 
 struct SQLiteInterface
@@ -32,6 +33,7 @@ struct SQLiteInterface
 	// Statement related interfaces
 	int (*sqlite3_prepare_v2)(sqlite3 *pDb, const char *sql, int nBytes,
 		sqlite3_stmt **ppStmt, const char **pzTail);
+    // Memory returned must not be freed by application.
     const char *(*sqlite3_errmsg)(sqlite3*);
 	int (*sqlite3_finalize)(sqlite3_stmt *pStmt);
 	int (*sqlite3_step)(sqlite3_stmt*);
@@ -45,13 +47,27 @@ struct SQLiteInterface
     int (*sqlite3_bind_text)(sqlite3_stmt*,int,const char*,int,void(*)(void*));
 	int (*sqlite3_bind_blob)(sqlite3_stmt*, int ordinal, const void *bytes,
 		int elSize, void(*)(void*));
-	const void *(*sqlite3_column_blob)(sqlite3_stmt*, int iCol);
+
+	int (*sqlite3_column_int)(sqlite3_stmt*, int iCol);
+	double (*sqlite3_column_double)(sqlite3_stmt*, int iCol);
+    const void *(*sqlite3_column_blob)(sqlite3_stmt*, int iCol);
 	int (*sqlite3_column_bytes)(sqlite3_stmt*, int iCol);
 	char const *(*sqlite3_column_text)(sqlite3_stmt*, int iCol);
+
+    // SQLITE_MUTEX_FAST, SQLITE_MUTEX_RECURSIVE
+    sqlite3_mutex_ptr (*sqlite3_mutex_alloc)(int);
+    void (*sqlite3_mutex_free)(sqlite3_mutex_ptr);
+    void (*sqlite3_mutex_enter)(sqlite3_mutex_ptr);
+    int (*sqlite3_mutex_try)(sqlite3_mutex_ptr);
+    void (*sqlite3_mutex_leave)(sqlite3_mutex_ptr);
 
     void (*sqlite3_free)(void*);
     };
 };
+
+#define SQLITE_MUTEX_FAST 0
+#define SQLITE_MUTEX_RECURSIVE 1
+
 
 // This is normally defined in sqlite3.h, so if more error codes are needed,
 // get them from there.
@@ -59,6 +75,8 @@ struct SQLiteInterface
 #define SQLITE_ERROR 1
 #define SQLITE_ROW 100
 #define SQLITE_DONE 101
+inline bool IS_SQLITE_ERROR(int x)  { return x>0 && x<100; }
+inline bool IS_SQLITE_OK(int x)  { return !IS_SQLITE_ERROR(x); }
 typedef void (*sqlite3_destructor_type)(void*);
 #define SQLITE_STATIC      ((sqlite3_destructor_type)0)
 #define SQLITE_TRANSIENT   ((sqlite3_destructor_type)-1)
@@ -83,7 +101,7 @@ class SQLiteListener
     };
 
 /// This is a wrapper class for the SQLite functions.
-class SQLite:private SQLiteImporter
+class SQLite:public SQLiteImporter
     {
     public:
 		friend class SQLiteStatement;
@@ -101,21 +119,18 @@ class SQLite:private SQLiteImporter
         /// The libName is usually libsqlite3.so.? on linux, and sqlite3.dll on windows.
         bool loadDbLib(char const *libName);
         /// The dbName is the name of the file that will be opened.
-        bool openDb(char const *dbName)
-            {
-            int retCode = sqlite3_open(dbName, &mDb);
-            return handleRetCode(retCode, "Unable to open database");
-            }
+        int openDb(char const *dbName)
+            { return handleRetCode(sqlite3_open(dbName, &mDb)); }
         /// This is called from the destructor, so does not need an additional
         /// call unless it must be closed early.
         void closeDb();
         /// Execute an SQL query.  If there are results, they will be reported
         /// through the listener.
-        bool execDb(const char *sql);
-	sqlite3 const *const getDb() const
-		{ return mDb; }
-	sqlite3 *const getDb()
-		{ return mDb; }
+        int execDb(const char *sql);
+        sqlite3 const *const getDb() const
+		    { return mDb; }
+        sqlite3 *const getDb()
+		    { return mDb; }
 
     private:
         sqlite3 *mDb;
@@ -127,7 +142,7 @@ class SQLite:private SQLiteImporter
             char **colValues, char **colNames);
         /// If the retCode indicates an error, then the errStr is sent to the
         /// listener.
-        bool handleRetCode(int retCode, char const *errStr);
+        int handleRetCode(int retCode);
     };
 
 // This was created for type safety.
@@ -139,60 +154,81 @@ struct SQLiteResult
 class SQLiteStatement
 {
 public:
-    SQLiteStatement(SQLite &db, char const *query):
-        mDb(db)
-        { set(query); }
+    SQLiteStatement(SQLite &db):
+        mDb(db), mStatement(nullptr)
+        {}
+	SQLiteStatement(SQLite &db, char const *query):
+		mDb(db)
+		{ set(query); }
     // This does a finalize.
 	~SQLiteStatement();
+    void setDb(SQLite &db)
+        { mDb = db; }
+    SQLite &getDb()
+        { return mDb; }
     int set(char const *query);
-    int step();
-    int reset()
-        { return mDb.sqlite3_reset(mStatement); }
+	int step();
+	int reset()
+        { return mDb.handleRetCode(mDb.sqlite3_reset(mStatement)); }
 
-    int getColumnBytes(int columnIndex) const
-        { return mDb.sqlite3_column_bytes(mStatement, columnIndex); }
-    char const *getColumnText(int columnIndex) const
-        { return mDb.sqlite3_column_text(mStatement, columnIndex); }
-    void const *getColumnBlob(int columnIndex) const
-        { return mDb.sqlite3_column_blob(mStatement, columnIndex); }
+	int getColumnInt(int columnIndex) const
+		{ return mDb.sqlite3_column_int(mStatement, columnIndex); }
+	double getColumnDouble(int columnIndex) const
+		{ return mDb.sqlite3_column_double(mStatement, columnIndex); }
+    // Since this must be called in order, this is removed.
+//    int getColumnBytes(int columnIndex) const
+//		{ return mDb->sqlite3_column_bytes(mStatement, columnIndex); }
+	char const *getColumnText(int columnIndex) const
+		{ return mDb.sqlite3_column_text(mStatement, columnIndex); }
+	void const *getColumnBlob(int columnIndex, int &numBytes) const
+		{
+        void const *blob = mDb.sqlite3_column_blob(mStatement, columnIndex);
+        numBytes = mDb.sqlite3_column_bytes(mStatement, columnIndex);
+        return blob;
+        }
 
-    // Bind ordinals are base one.
+    // Bind ordinals are base one. The ordinal parameters can be passed a
+    // bind string such as ":id". Then this will bind a value to a parameter
+    // in the query such as "select from tablex where(id=:id);"
     int bindNull(int ordinal)
-        { return mDb.sqlite3_bind_null(mStatement, ordinal); }
+		{ return mDb.handleRetCode(mDb.sqlite3_bind_null(mStatement, ordinal)); }
     int bindNull(char const *param)
-        {
-        return mDb.sqlite3_bind_null(mStatement,
-            mDb.sqlite3_bind_parameter_index(mStatement, param));
+		{
+        return mDb.handleRetCode(mDb.sqlite3_bind_null(mStatement,
+            mDb.sqlite3_bind_parameter_index(mStatement, param)));
         }
-    int bindInt(int ordinal, int val)
-        { return mDb.sqlite3_bind_int(mStatement, ordinal, val); }
-    int bindInt(char const *param, int val)
-        {
-        return mDb.sqlite3_bind_int(mStatement, 
-            mDb.sqlite3_bind_parameter_index(mStatement, param), val);
+	int bindInt(int ordinal, int val)
+		{ return mDb.handleRetCode(mDb.sqlite3_bind_int(mStatement, ordinal, val)); }
+	int bindInt(char const *param, int val)
+		{
+        return mDb.handleRetCode(mDb.sqlite3_bind_int(mStatement, 
+            mDb.sqlite3_bind_parameter_index(mStatement, param), val));
         }
-    int bindDouble(int ordinal, double val)
-        { return mDb.sqlite3_bind_double(mStatement, ordinal, val); }
-    int bindDouble(char const *param, double val)
-        { 
-        return mDb.sqlite3_bind_double(mStatement, 
-            mDb.sqlite3_bind_parameter_index(mStatement, param), val);
+	int bindDouble(int ordinal, double val)
+		{ return mDb.handleRetCode(mDb.sqlite3_bind_double(mStatement, ordinal, val)); }
+	int bindDouble(char const *param, double val)
+		{ 
+        return mDb.handleRetCode(mDb.sqlite3_bind_double(mStatement, 
+            mDb.sqlite3_bind_parameter_index(mStatement, param), val));
         }
-    int bindText(int ordinal, char const *val)
-        {
+	int bindText(int ordinal, char const *val)
+		{
         /// @todo - strlen may not be right for UTF-8
-        return mDb.sqlite3_bind_text(mStatement, ordinal, val,
-            static_cast<int>(strlen(val)), nullptr);
+        return mDb.handleRetCode(mDb.sqlite3_bind_text(mStatement, ordinal, val,
+            static_cast<int>(strlen(val)), nullptr));
         }
-    int bindText(char const *param, char const *val)
-        {
+	int bindText(char const *param, char const *val)
+		{
         /// @todo - strlen may not be right for UTF-8
-        return mDb.sqlite3_bind_text(mStatement,
+        return mDb.handleRetCode(mDb.sqlite3_bind_text(mStatement,
             mDb.sqlite3_bind_parameter_index(mStatement, param), val,
-            static_cast<int>(strlen(val)), nullptr);
+            static_cast<int>(strlen(val)), nullptr));
         }
-    int bindBlob(int ordinal, const void *bytes, int elNumBytes)
-        { return mDb.sqlite3_bind_blob(mStatement, ordinal, bytes, elNumBytes, SQLITE_STATIC); }
+	int bindBlob(int ordinal, const void *bytes, int elNumBytes)
+		{
+        return mDb.handleRetCode(mDb.sqlite3_bind_blob(mStatement, ordinal,
+            bytes, elNumBytes, SQLITE_STATIC));
+        }
 
 private:
 	sqlite3_stmt *mStatement;
@@ -200,27 +236,67 @@ private:
 };
 
 class SQLiteTransaction
-{
-public:
-	SQLiteTransaction(SQLite &db):
-	    mDb(db), mInTransaction(false)
-		{
-		begin();
-		}
+    {
+    public:
+	    SQLiteTransaction(SQLite &db):
+	        mDb(db), mInTransaction(false)
+		    {
+		    begin();
+		    }
 
-	~SQLiteTransaction()
-		{ end(); }
-	void transact()
-		{
-		end();
-		begin();
-		}
-	void begin();
-	void end();
+	    ~SQLiteTransaction()
+		    { end(); }
+	    void transact()
+		    {
+		    end();
+		    begin();
+		    }
+	    void begin();
+	    void end();
 
-private:
-	SQLite &mDb;
-	bool mInTransaction;
-};
+    private:
+	    SQLite &mDb;
+	    bool mInTransaction;
+    };
+
+class SQLiteMutex
+    {
+    public:
+        SQLiteMutex(SQLite const &db):
+            mDb(db)
+            {
+            mMutexPtr = db.sqlite3_mutex_alloc(SQLITE_MUTEX_FAST);
+            }
+        void Enter()
+            {
+            mDb.sqlite3_mutex_enter(mMutexPtr);
+            }
+        void Leave()
+            {
+            mDb.sqlite3_mutex_leave(mMutexPtr);
+            }
+        ~SQLiteMutex()
+            {
+            mDb.sqlite3_mutex_free(mMutexPtr);
+            }
+    private:
+        SQLite const &mDb;
+        sqlite3_mutex_ptr mMutexPtr;
+    };
+
+class SQLiteMutexGuard
+    {
+    public:
+        SQLiteMutexGuard(SQLiteMutex &mutex):
+            mMutex(mutex)
+            {
+            mMutex.Enter();
+            }
+        ~SQLiteMutexGuard()
+            {
+            mMutex.Leave();
+            }
+        SQLiteMutex &mMutex;
+    };
 
 #endif

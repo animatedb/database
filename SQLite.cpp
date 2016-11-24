@@ -26,9 +26,18 @@ void SQLiteImporter::loadSymbols()
 	loadModuleSymbol("sqlite3_bind_double", (ModuleProcPtr*)&sqlite3_bind_double);
 	loadModuleSymbol("sqlite3_bind_text", (ModuleProcPtr*)&sqlite3_bind_text);
 
+	loadModuleSymbol("sqlite3_column_int", (ModuleProcPtr*)&sqlite3_column_int);
+	loadModuleSymbol("sqlite3_column_double", (ModuleProcPtr*)&sqlite3_column_double);
 	loadModuleSymbol("sqlite3_column_blob", (ModuleProcPtr*)&sqlite3_column_blob);
 	loadModuleSymbol("sqlite3_column_bytes", (ModuleProcPtr*)&sqlite3_column_bytes);
     loadModuleSymbol("sqlite3_column_text", (ModuleProcPtr*)&sqlite3_column_text);
+
+    loadModuleSymbol("sqlite3_mutex_alloc", (ModuleProcPtr*)&sqlite3_mutex_alloc);
+    loadModuleSymbol("sqlite3_mutex_free", (ModuleProcPtr*)&sqlite3_mutex_free);
+    loadModuleSymbol("sqlite3_mutex_enter", (ModuleProcPtr*)&sqlite3_mutex_enter);
+    loadModuleSymbol("sqlite3_mutex_try", (ModuleProcPtr*)&sqlite3_mutex_try);
+    loadModuleSymbol("sqlite3_mutex_leave", (ModuleProcPtr*)&sqlite3_mutex_leave);
+
     // This must be called for returned error strings.
     loadModuleSymbol("sqlite3_free", (ModuleProcPtr*)&sqlite3_free);
     }
@@ -48,21 +57,15 @@ void SQLite::closeDb()
     {
     if(mDb)
         {
-        sqlite3_close(mDb);
+        handleRetCode(sqlite3_close(mDb));
         mDb = nullptr;
         }
     }
 
-bool SQLite::execDb(const char *sql)
+int SQLite::execDb(const char *sql)
     {
-    char *errMsg = nullptr;
-    int retCode = sqlite3_exec(mDb, sql, &resultsCallback, this, &errMsg);
-    bool success = handleRetCode(retCode, errMsg);
-    if(errMsg)
-        {
-        sqlite3_free(errMsg);
-        }
-    return success;
+    int retCode = sqlite3_exec(mDb, sql, &resultsCallback, this, nullptr);
+    return handleRetCode(retCode);
     }
 
 int SQLite::resultsCallback(void *customData, int numColumns,
@@ -76,20 +79,20 @@ int SQLite::resultsCallback(void *customData, int numColumns,
     return 0;
     }
 
-bool SQLite::handleRetCode(int retCode, char const *errStr)
+int SQLite::handleRetCode(int retCode)
     {
-    if(retCode != SQLITE_OK && mListener)
+    if(IS_SQLITE_ERROR(retCode) && mListener)
         {
-        mListener->SQLError(retCode, errStr);
+        mListener->SQLError(retCode, sqlite3_errmsg(mDb));
         }
-    return(retCode == SQLITE_OK);
+    return(retCode);
     }
 
 SQLiteStatement::~SQLiteStatement()
 	{
 	if(mStatement)
 		{
-		mDb.sqlite3_finalize(mStatement);
+		mDb.handleRetCode(mDb.sqlite3_finalize(mStatement));
 		mStatement = nullptr;
 		}
 	}
@@ -100,23 +103,15 @@ int SQLiteStatement::set(char const *query)
         {
         reset();
         }
-    mStatement = nullptr;
-    int res = mDb.sqlite3_prepare_v2(mDb.getDb(), query, -1, &mStatement, nullptr);
-//    if(res == SQLITE_ERROR)
-//        {
-//        ErrorTrace(mDb.sqlite3_errmsg(mDb.getDb()));
-//        }
-    return res;
+	mStatement = nullptr;
+	int res = mDb.sqlite3_prepare_v2(mDb.getDb(), query, -1, &mStatement, nullptr);
+    return mDb.handleRetCode(res);
     }
 
 int SQLiteStatement::step()
     {
     int res = mDb.sqlite3_step(mStatement);
-//    if(res != SQLITE_OK && res != SQLITE_DONE && res != SQLITE_ROW)
-//        {
-//        ErrorTrace(mDb.sqlite3_errmsg(mDb.getDb()));
-//        }
-    return res;
+    return mDb.handleRetCode(res);
     }
 
 void SQLiteTransaction::begin()
