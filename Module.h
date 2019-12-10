@@ -55,10 +55,11 @@ class Module
 
     private:
 #ifdef __linux__
-        void *mLibrary;
+        void *mModule;
 #else
         HMODULE mModule;
 #endif
     };
 
 #endif
+

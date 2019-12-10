@@ -15,10 +15,10 @@ bool Module::open(char const *fileName)
     {
     close();
 #if(USE_GLIB)
-    mLibrary = g_module_open(fileName, G_MODULE_BIND_LAZY);
+    mModule = g_module_open(fileName, G_MODULE_BIND_LAZY);
 #else
 #ifdef __linux__
-    mLibrary = dlopen(fileName, RTLD_LAZY);
+    mModule = dlopen(fileName, RTLD_LAZY);
 #else
     mModule = LoadLibraryA(fileName);
 #endif
@@ -56,3 +56,4 @@ void Module::loadModuleSymbol(const char *symbolName, ModuleProcPtr *symbol) con
 #endif
 #endif
     }
+
